@@ -1,1 +1,0 @@
-Projeto de construção de um servidor iterativo utilizando API socket.
