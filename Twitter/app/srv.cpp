@@ -3,6 +3,10 @@
 #define MAX_NR_USERS 20
 #define MAX_SIZE_NAME 40
 using namespace std;
+const int INF = 1e6;
+
+
+
 class Node{
 public: 
   char *IP;
@@ -46,12 +50,16 @@ class Server : public Node
 
 
 public:
+  
   pthread_t threads[NUMTHREADS];
+  static int subscription;
+  static pthread_mutex_t mutex;
   static map<char*, Client*> IpToClient;
   static set< Client *> clients; 
   static set< string >  logins_used;
   static map< string, Client* > name_refer;
   static map< string, set< pair< string , int >  > >followers;
+  static map< int, pair< string, string> > subs; // number subscription to ( follower, follow );
   int tid; // Thread_ids;
   
   Server(){}
@@ -62,13 +70,14 @@ public:
   void Create(){
     this->sock = CreateServer(this->PORT);
   }
- static int ResponseOkUser(const TSocket &sock);
+ static int ResponseOkUser(const TSocket &sock,const int &subs);
  static int addUser( void* client , char *buffer);
  static void ResponseExcepetionUser(const int &op, const TSocket &sock);
  static void* HandleRequest(void* args);
  static int Subscribe(void* client, char *buffer);
  static int Publish(void* client, char *buffer_args);
  static int DeleteProfile(void* client, char*buffer);
+ static int CancelSubscription(void* client, char* buffer);
  void Connection();  
 };
 
@@ -130,7 +139,7 @@ void* Server:: HandleRequest(void* args){
         ok = addUser( args , buffer);
         if(ok == 1){
           printf("\n+\n+ %s\n+ ADD\n+\n", A-> IP);
-          ResponseOkUser(A->sock);
+          ResponseOkUser(A->sock,ok);
         }
         else{
           printf("\n+\n+ %s\n+ CANNOT ADD\n+\n", A-> IP);
@@ -139,9 +148,9 @@ void* Server:: HandleRequest(void* args){
         break;
       case '2':
         ok =  Subscribe( args, buffer );
-        if(ok == 1){
+        if(ok != 0){
           printf("\n+\n+ %s\n+ ADD\n+\n", A-> IP);
-          ResponseOkUser(A->sock);
+          ResponseOkUser(A->sock,ok);
         }
         else{
           printf("\n+\n+ %s\n+ CANNOT FIND SUBSCRIBER\n+\n", A-> IP);
@@ -149,6 +158,15 @@ void* Server:: HandleRequest(void* args){
         }
         break;
       case '3':
+        ok = CancelSubscription(args,buffer);
+        if(ok != 0){
+          printf("\n+\n+ %s\n+ Canceled Subscription\n+\n", A-> IP);
+          ResponseOkUser(A->sock,ok);
+        }
+        else{
+          printf("\n+\n+ %s\n+ CANNOT FIND SUBSCRIBER\n+\n", A-> IP);
+          ResponseExcepetionUser(ok, A->sock);
+        }
         // O que quer dizer com codigo da subscricao, pensei que o nome era a chave primaria visto que so pode ter 1.
          break;
       case '4':
@@ -157,7 +175,7 @@ void* Server:: HandleRequest(void* args){
 
         if(ok){
           printf("\n+\n+ %s\n+ PUBLISH\n+\n", A-> IP);
-          ResponseOkUser(A->sock);
+          ResponseOkUser(A->sock,ok);
         }
         else{
           printf("\n+\n+ %s\n+ CANNOT PUBLISH\n+\n", A-> IP);
@@ -170,7 +188,7 @@ void* Server:: HandleRequest(void* args){
         ok = DeleteProfile(args,buffer);
         if(ok){
           printf("\n+\n+ %s\n+ DELETE\n+\n", A-> IP);
-          ResponseOkUser(A->sock);
+          ResponseOkUser(A->sock,ok);
         }
         else{
           printf("\n+\n+ %s\n+ CANNOT DELETE\n+\n", A-> IP);
@@ -180,7 +198,7 @@ void* Server:: HandleRequest(void* args){
       break;
       default:
       printf("\nInvalid option in user\n");
-      if (WriteN(client, "0\n", 2) <= 0)
+      if (WriteN(A->sock, "0\n", 2) <= 0)
         ExitWithError("WriteN() in ResponseAllUsers failed");
 
     }
@@ -191,7 +209,7 @@ void* Server:: HandleRequest(void* args){
 int Server::DeleteProfile(void* client, char *buffer){
   Client *A = ( (Client *) client); // making a cast for a object
     // Modularizar o parser, fazer uma funcao para isso!
-    string parser(buffer_args);
+    string parser(buffer);
     stringstream ss(parser); //stream that will parser
     vector<string> v;        // vector with the strings;
     while(ss >> parser){ v.pb(parser); }
@@ -201,9 +219,11 @@ int Server::DeleteProfile(void* client, char *buffer){
     if(logins_used.find(UserLogin) == logins_used.end())
       return 0;
 
-    // Delete things here
+    logins_used.erase( logins_used.find(UserLogin) );
+    followers.erase( followers.find(UserLogin) );
+    IpToClient.erase( IpToClient.find( A->IP )  );
 
-
+    return 1;
 }
 
 int Server::Publish(void* client, char *buffer_args){
@@ -245,7 +265,7 @@ int Server::Publish(void* client, char *buffer_args){
 
 }
 
-int Server:: Subscribe(void* client, char* buffer){
+int Server::Subscribe(void* client, char* buffer){
     Client *A = ( (Client *) client); // making a cast for a object
     string parser(buffer);
     stringstream ss(parser); //stream that will parser
@@ -261,12 +281,46 @@ int Server:: Subscribe(void* client, char* buffer){
     if(logins_used.find(follow) == logins_used.end())
       return 0;
 
+    int s; // variavel auxiliar
+    pthread_mutex_lock(&mutex);
+    
+    s = subscription++;
+
+    pthread_mutex_unlock(&mutex);
+
+    subs[s] = mp(follow,A->UserLogin); // gambiarra pra usar o codigo de subscricao.
     followers[follow].insert( mp( A->UserLogin, stoi(port) )) ;
+
+    return s;
+}
+int Server::CancelSubscription(void*client, char*buffer){
+   Client *A = ( (Client *) client); // making a cast for a object
+    string parser(buffer);
+    stringstream ss(parser); //stream that will parser
+    vector<string> v;        // vector with the strings;
+    while(ss >> parser){ v.pb(parser); }
+    
+    if(v.size() != 3) 
+      return 2;
+    int s;
+    s = stoi(v[2]);
+
+
+    if( subs.find(s) == subs.end() ){
+      return 0;
+    }
+
+    string follow = subs[s].st;
+    string UserLogin = subs[s].nd;
+    set< pair<string,int> >::iterator it;
+    it = followers[follow].lower_bound( mp(UserLogin, INF)  ); 
+    followers[follow].erase(  it  );
+    subs.erase(  subs.find(s)  );
+
 
     return 1;
 }
-
-int Server:: addUser( void* client , char *buffer){
+int Server::addUser( void* client , char *buffer){
     Client *A = ( (Client *) client); // making a cast for a object
     string parser(buffer);
     parser = parser.substr(2); // Avoid operation and the first space  
@@ -286,8 +340,13 @@ int Server:: addUser( void* client , char *buffer){
     return 1;
 }
 
-int Server:: ResponseOkUser(const TSocket &sock){
-  if(WriteN(sock, "1 \n", 4) < 0 )
+int Server::ResponseOkUser(const TSocket &sock, const int &subs){
+  char buffer[240];
+  string val = "1 " + to_string(subs) + " \n";
+  memcpy( buffer,val.c_str(), val.size()  );    //gambiarra
+
+
+  if(WriteN(sock, buffer , sizeof(buffer)) < 0 )
     ExitWithError("WriteN() failed");
 }
 
@@ -298,6 +357,9 @@ set< string > Server::logins_used;
 map<string, Client*> Server::name_refer;
 map< string, set< pair< string , int >  > > Server::followers;
 map<char*, Client*> Server::IpToClient;
+map< int, pair< string, string> > Server ::subs;
+int Server::subscription = 0;
+pthread_mutex_t Server::mutex =  PTHREAD_MUTEX_INITIALIZER;
 int main(int argc, char ** argv){
 
   if (argc != 3) {
