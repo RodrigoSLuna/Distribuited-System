@@ -115,10 +115,6 @@ void Server::Connection(){
       if(pthread_create(&threads[tid++], NULL, (THREADFUNCPTR) &Server::HandleRequest ,a) )
         ExitWithError("pthread_create() failed");
 
-      printf("\n|Connection Closed\n");
-      printf("|-IP: %s\n", a->IP);
-      printf("sock: %d\n",a->sock);
-      close(a->sock);
 
       }
     }
@@ -133,7 +129,7 @@ void* Server:: HandleRequest(void* args){
     char buffer[ BUFSIZE ],user_option;
     if(args == NULL ) puts("NULL");
     Client *A = (Client* )args;
-
+    printf("Sock: %d, IP sendo tratado: %s\n",A->sock,A->IP);
     if (ReadLine(A->sock, buffer, BUFSIZE) < 0) {
       printf("\nRequest message can't be read\n");
       return NULL;
@@ -207,6 +203,12 @@ void* Server:: HandleRequest(void* args){
         ExitWithError("WriteN() in ResponseAllUsers failed");
 
     }
+
+    printf("\n|Connection Closed\n");
+    printf("|-IP: %s\n", A->IP);
+    printf("sock: %d\n",A->sock);
+    close(A->sock);
+
   }
 
 
@@ -255,7 +257,9 @@ int Server::Publish(void* client, char *buffer_args){
     for(auto user: followers[UserLogin]){
 
       //Abro uma conexao com cada um, e envio a MSG, posso fazer essa parte em paralelo
+
       Client *follow = name_refer[ user.st ];
+      cout << "Enviando para o IP: " << follow->IP << endl;
       int PORT = user.nd;
 
       TSocket sender = ConnectToServer(follow-> IP ,PORT);
@@ -328,12 +332,14 @@ int Server::addUser( void* client , char *buffer){
     Client *A = ( (Client *) client); // making a cast for a object
     string parser(buffer);
     parser = parser.substr(2); // Avoid operation and the first space
-
+    cout << parser << endl;
     int pos_space = parser.find(" ");
     if(pos_space == string::npos){
       return 2;
     }
     string name = parser.substr(0,pos_space);
+    cout << "Nome  " << name << endl;
+
     if(logins_used.find(name) != logins_used.end() )
       return 0;
 
