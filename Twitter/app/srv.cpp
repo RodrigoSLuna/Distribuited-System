@@ -36,7 +36,7 @@ void getIP(TSocket sock, char* A){
   struct sockaddr_in cliAddr;
   memset((void *) &cliAddr, 0, sizeof(cliAddr));
   cliLen = sizeof(cliAddr);
-  printf("sock: %d\n",sock);
+  printf("->>>sock: %d\n",sock);
   if (getpeername(sock, (struct sockaddr *) &cliAddr, &cliLen)) {
     ExitWithError("Error in getting IP");
   }
@@ -115,14 +115,17 @@ void Server::Connection(){
       if(pthread_create(&threads[tid++], NULL, (THREADFUNCPTR) &Server::HandleRequest ,a) )
         ExitWithError("pthread_create() failed");
 
-
+      //Alocando e desalocando
+      delete a;
       }
     }
 
 void Server:: ResponseExcepetionUser(const int &op, const TSocket &sock){
-  if(op == 0)
-    if(WriteN(sock, "0 \n", 4) < 0 )
-    ExitWithError("WriteN() failed");
+  if(op == 0){
+    printf("ENVIANDO EXCEPTION PARA CONEXAO: %d\n",sock);
+    if(WriteN(sock, "0 \n", 5) < 0 )
+      ExitWithError("WriteN() failed");
+  }
 }
 
 void* Server:: HandleRequest(void* args){
@@ -131,7 +134,9 @@ void* Server:: HandleRequest(void* args){
     Client *A = (Client* )args;
     printf("Sock: %d, IP sendo tratado: %s\n",A->sock,A->IP);
     if (ReadLine(A->sock, buffer, BUFSIZE) < 0) {
-      printf("\nRequest message can't be read\n");
+      printf("\nRequest message can't be read: %d, IP: %s\n",A->sock,A->IP);
+      //ResponseExcepetionUser(0, A->sock);
+
       return NULL;
     }
     user_option = buffer[0];
@@ -208,7 +213,7 @@ void* Server:: HandleRequest(void* args){
     printf("|-IP: %s\n", A->IP);
     printf("sock: %d\n",A->sock);
     close(A->sock);
-
+    pthread_exit(NULL);
   }
 
 
@@ -239,10 +244,12 @@ int Server::Publish(void* client, char *buffer_args){
     string parser(buffer_args);
     stringstream ss(parser); //stream that will parser
     vector<string> v;        // vector with the strings;
+    cout << " parser: " <<  parser << endl;
     while(ss >> parser){ v.pb(parser); }
 
     string UserLogin = v[1];
     string MSG = "";
+    cout << UserLogin << endl;
     for(int i = 2;i<v.size();i++) MSG += (i != 2? " " + v[i] : v[i] );
 
 
@@ -254,6 +261,7 @@ int Server::Publish(void* client, char *buffer_args){
     char buffer[BUFSIZE];
     strcpy(buffer,MSG.c_str());
     // Possivel paralelizar essa parte do envio!
+    printf("Possui %d quantidade de followers", followers[UserLogin].size());
     for(auto user: followers[UserLogin]){
 
       //Abro uma conexao com cada um, e envio a MSG, posso fazer essa parte em paralelo
