@@ -8,7 +8,7 @@ const int INF = 1e6;
 
 
 class Node{
-public: 
+public:
   char *IP;
   unsigned int PORT;
   TSocket sock;
@@ -16,7 +16,7 @@ public:
   Node(){}
   Node(char *IP, unsigned int &PORT){
     this->IP = IP;
-    this->PORT = PORT; 
+    this->PORT = PORT;
   }
   ~Node(){}
 
@@ -50,18 +50,18 @@ class Server : public Node
 
 
 public:
-  
+
   pthread_t threads[NUMTHREADS];
   static int subscription;
   static pthread_mutex_t mutex;
   static map<char*, Client*> IpToClient;
-  static set< Client *> clients; 
+  static set< Client *> clients;
   static set< string >  logins_used;
   static map< string, Client* > name_refer;
   static map< string, set< pair< string , int >  > >followers;
   static map< int, pair< string, string> > subs; // number subscription to ( follower, follow );
   int tid; // Thread_ids;
-  
+
   Server(){}
   Server(char *IP, unsigned int PORT) : Node( IP,PORT) { }
   ~Server(){}
@@ -78,7 +78,7 @@ public:
  static int Publish(void* client, char *buffer_args);
  static int DeleteProfile(void* client, char*buffer);
  static int CancelSubscription(void* client, char* buffer);
- void Connection();  
+ void Connection();
 };
 
 
@@ -88,14 +88,14 @@ void Server::Connection(){
     while( true ){
       if(tid == NUMTHREADS)
         ExitWithError("Number of threads is over");
-    
+
       puts("Waitting Connection...");
 
 
       // Check if the client already exist!!!! cuz the client could change his name! or something else.
       // Estou criando um novo Client sempre... ruim <, para cada conexão!
       Client *a = new Client();
-      
+
       int sock_aux = AcceptConnection( this->sock  );
       char IP[IPSIZE];
       getIP( sock_aux ,IP );
@@ -111,9 +111,15 @@ void Server::Connection(){
       printf("\n|Connection Started\n");
       printf("|-IP: %s\n", a->IP);
       printf("sock: %d\n",a->sock);
-      
+
       if(pthread_create(&threads[tid++], NULL, (THREADFUNCPTR) &Server::HandleRequest ,a) )
         ExitWithError("pthread_create() failed");
+
+      printf("\n|Connection Closed\n");
+      printf("|-IP: %s\n", a->IP);
+      printf("sock: %d\n",a->sock);
+      close(a->sock);
+
       }
     }
 
@@ -124,7 +130,7 @@ void Server:: ResponseExcepetionUser(const int &op, const TSocket &sock){
 }
 
 void* Server:: HandleRequest(void* args){
-    char buffer[ BUFSIZE ],user_option;  
+    char buffer[ BUFSIZE ],user_option;
     if(args == NULL ) puts("NULL");
     Client *A = (Client* )args;
 
@@ -171,7 +177,6 @@ void* Server:: HandleRequest(void* args){
          break;
       case '4':
         ok = Publish( args, buffer );
-        
 
         if(ok){
           printf("\n+\n+ %s\n+ PUBLISH\n+\n", A-> IP);
@@ -183,7 +188,7 @@ void* Server:: HandleRequest(void* args){
 
         }
 
-        break;  
+        break;
       case '5':
         ok = DeleteProfile(args,buffer);
         if(ok){
@@ -202,7 +207,7 @@ void* Server:: HandleRequest(void* args){
         ExitWithError("WriteN() in ResponseAllUsers failed");
 
     }
-  } 
+  }
 
 
 
@@ -237,12 +242,12 @@ int Server::Publish(void* client, char *buffer_args){
     string UserLogin = v[1];
     string MSG = "";
     for(int i = 2;i<v.size();i++) MSG += (i != 2? " " + v[i] : v[i] );
-  
+
 
     if( logins_used.find(UserLogin) == logins_used.end() )
       return 0;
 
-    
+
 
     char buffer[BUFSIZE];
     strcpy(buffer,MSG.c_str());
@@ -252,7 +257,6 @@ int Server::Publish(void* client, char *buffer_args){
       //Abro uma conexao com cada um, e envio a MSG, posso fazer essa parte em paralelo
       Client *follow = name_refer[ user.st ];
       int PORT = user.nd;
-      
 
       TSocket sender = ConnectToServer(follow-> IP ,PORT);
       if(WriteN(sender, buffer , BUFSIZE ) < 0){
@@ -271,10 +275,10 @@ int Server::Subscribe(void* client, char* buffer){
     stringstream ss(parser); //stream that will parser
     vector<string> v;        // vector with the strings;
     while(ss >> parser){ v.pb(parser); }
-    
-    if(v.size() != 3) 
+
+    if(v.size() != 3)
       return 2;
-    
+
     string follow = v[1];
     string port   = v[2];
 
@@ -283,7 +287,7 @@ int Server::Subscribe(void* client, char* buffer){
 
     int s; // variavel auxiliar
     pthread_mutex_lock(&mutex);
-    
+
     s = subscription++;
 
     pthread_mutex_unlock(&mutex);
@@ -299,8 +303,8 @@ int Server::CancelSubscription(void*client, char*buffer){
     stringstream ss(parser); //stream that will parser
     vector<string> v;        // vector with the strings;
     while(ss >> parser){ v.pb(parser); }
-    
-    if(v.size() != 3) 
+
+    if(v.size() != 3)
       return 2;
     int s;
     s = stoi(v[2]);
@@ -313,7 +317,7 @@ int Server::CancelSubscription(void*client, char*buffer){
     string follow = subs[s].st;
     string UserLogin = subs[s].nd;
     set< pair<string,int> >::iterator it;
-    it = followers[follow].lower_bound( mp(UserLogin, INF)  ); 
+    it = followers[follow].lower_bound( mp(UserLogin, INF)  );
     followers[follow].erase(  it  );
     subs.erase(  subs.find(s)  );
 
@@ -323,7 +327,7 @@ int Server::CancelSubscription(void*client, char*buffer){
 int Server::addUser( void* client , char *buffer){
     Client *A = ( (Client *) client); // making a cast for a object
     string parser(buffer);
-    parser = parser.substr(2); // Avoid operation and the first space  
+    parser = parser.substr(2); // Avoid operation and the first space
 
     int pos_space = parser.find(" ");
     if(pos_space == string::npos){
