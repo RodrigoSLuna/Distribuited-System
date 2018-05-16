@@ -102,6 +102,7 @@ void Server::Connection(){
 
       if(IpToClient.find( IP ) != IpToClient.end() ){
         a = IpToClient[IP];
+        a->sock = sock_aux;
       }
       else{
         a->IP = IP;
