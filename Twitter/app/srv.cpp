@@ -2,6 +2,7 @@
 #include "structs.h"
 #define MAX_NR_USERS 20
 #define MAX_SIZE_NAME 40
+#define watch(S1,S2) printf("DEBUG %s %s \n",S1,S2);
 using namespace std;
 const int INF = 1e6;
 
@@ -94,21 +95,22 @@ void Server::Connection(){
 
       // Check if the client already exist!!!! cuz the client could change his name! or something else.
       // Estou criando um novo Client sempre... ruim <, para cada conexão!
-      Client *a = new Client();
+      Client *a = new Client() ;
 
       int sock_aux = AcceptConnection( this->sock  );
       char IP[IPSIZE];
       getIP( sock_aux ,IP );
-
-      if(IpToClient.find( IP ) != IpToClient.end() ){
-        a = IpToClient[IP];
-        a->sock = sock_aux;
-      }
-      else{
+      printf("IP::: %s\n",IP);
+      // if(IpToClient.find( IP ) != IpToClient.end() ){
+      //   a = IpToClient[IP];
+      //   a->sock = sock_aux;
+      //   a->IP = IP;
+      // }
+      // else{
         a->IP = IP;
         a->sock = sock_aux;
         IpToClient[IP] = a;
-      }
+      // }
       printf("\n|Connection Started\n");
       printf("|-IP: %s\n", a->IP);
       printf("sock: %d\n",a->sock);
@@ -116,8 +118,7 @@ void Server::Connection(){
       if(pthread_create(&threads[tid++], NULL, (THREADFUNCPTR) &Server::HandleRequest ,a) )
         ExitWithError("pthread_create() failed");
 
-      //Alocando e desalocando
-      delete a;
+      //delete a;
       }
     }
 
@@ -220,7 +221,7 @@ void* Server:: HandleRequest(void* args){
 
 
 int Server::DeleteProfile(void* client, char *buffer){
-  Client *A = ( (Client *) client); // making a cast for a object
+  Client *A = ( (Client *) client); // ma'king a cast for a object
     // Modularizar o parser, fazer uma funcao para isso!
     string parser(buffer);
     stringstream ss(parser); //stream that will parser
@@ -231,10 +232,12 @@ int Server::DeleteProfile(void* client, char *buffer){
 
     if(logins_used.find(UserLogin) == logins_used.end())
       return 0;
-
+    //watch("DeleteProfile", UserLogin.c_str())
     logins_used.erase( logins_used.find(UserLogin) );
     followers.erase( followers.find(UserLogin) );
-    IpToClient.erase( IpToClient.find( A->IP )  );
+
+    if(IpToClient.find(A->IP) != IpToClient.end() )
+      IpToClient.erase( IpToClient.find( A->IP )  );
 
     return 1;
 }
@@ -249,25 +252,26 @@ int Server::Publish(void* client, char *buffer_args){
     while(ss >> parser){ v.pb(parser); }
 
     string UserLogin = v[1];
-    string MSG = "";
+    string MSG = "TESTE ";
     cout << UserLogin << endl;
-    for(int i = 2;i<v.size();i++) MSG += (i != 2? " " + v[i] : v[i] );
-
-
+    for(int i = 0;i<v.size();i++)
+      printf("%s\n",v[i].c_str());
+    for(int i = 2;i<v.size();i++)
+      MSG += v[i] + " ";
+    MSG += '\n';
+    cout << MSG;
     if( logins_used.find(UserLogin) == logins_used.end() )
       return 0;
 
-
-
     char buffer[BUFSIZE];
-    strcpy(buffer,MSG.c_str());
+    strcpy(buffer,"TESTE");
     // Possivel paralelizar essa parte do envio!
     printf("Possui %d quantidade de followers", followers[UserLogin].size());
     for(auto user: followers[UserLogin]){
-
+      puts("HERE");
       //Abro uma conexao com cada um, e envio a MSG, posso fazer essa parte em paralelo
-
-      Client *follow = name_refer[ user.st ];
+      Client *follow = new Client(); 
+      follow = name_refer[ user.st ];
       cout << "Enviando para o IP: " << follow->IP << endl;
       int PORT = user.nd;
 
@@ -275,6 +279,7 @@ int Server::Publish(void* client, char *buffer_args){
       if(WriteN(sender, buffer , BUFSIZE ) < 0){
         ExitWithError("WriteN Failed()");
       }
+
       close(sender);
 
     }
