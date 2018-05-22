@@ -101,16 +101,16 @@ void Server::Connection(){
       char IP[IPSIZE];
       getIP( sock_aux ,IP );
       printf("IP::: %s\n",IP);
-      // if(IpToClient.find( IP ) != IpToClient.end() ){
-      //   a = IpToClient[IP];
-      //   a->sock = sock_aux;
-      //   a->IP = IP;
-      // }
-      // else{
+       if(IpToClient.find( IP ) != IpToClient.end() ){
+         a = IpToClient[IP];
+         a->sock = sock_aux;
+         a->IP = IP;
+       }
+       else{
         a->IP = IP;
         a->sock = sock_aux;
         IpToClient[IP] = a;
-      // }
+      }
       printf("\n|Connection Started\n");
       printf("|-IP: %s\n", a->IP);
       printf("sock: %d\n",a->sock);
@@ -134,7 +134,7 @@ void* Server:: HandleRequest(void* args){
     char buffer[ BUFSIZE ],user_option;
     if(args == NULL ) puts("NULL");
     Client *A = (Client* )args;
-    printf("Sock: %d, IP sendo tratado: %s\n",A->sock,A->IP);
+    printf("Sock: %d, IP sendo tratado: %s, nome sendo tratado: %s\n",A->sock,A->IP,A->UserLogin.c_str());
     if (ReadLine(A->sock, buffer, BUFSIZE) < 0) {
       printf("\nRequest message can't be read: %d, IP: %s\n",A->sock,A->IP);
       //ResponseExcepetionUser(0, A->sock);
@@ -221,7 +221,8 @@ void* Server:: HandleRequest(void* args){
 
 
 int Server::DeleteProfile(void* client, char *buffer){
-  Client *A = ( (Client *) client); // ma'king a cast for a object
+    pthread_mutex_lock(&mutex);
+    Client *A = ( (Client *) client); // ma'king a cast for a object
     // Modularizar o parser, fazer uma funcao para isso!
     string parser(buffer);
     stringstream ss(parser); //stream that will parser
@@ -238,41 +239,41 @@ int Server::DeleteProfile(void* client, char *buffer){
 
     if(IpToClient.find(A->IP) != IpToClient.end() )
       IpToClient.erase( IpToClient.find( A->IP )  );
-
+    pthread_mutex_unlock(&mutex);
     return 1;
 }
 
 int Server::Publish(void* client, char *buffer_args){
+    pthread_mutex_lock(&mutex);
     Client *A = ( (Client *) client); // making a cast for a object
     // Modularizar o parser, fazer uma funcao para isso!
     string parser(buffer_args);
     stringstream ss(parser); //stream that will parser
     vector<string> v;        // vector with the strings;
-    cout << " parser: " <<  parser << endl;
     while(ss >> parser){ v.pb(parser); }
 
     string UserLogin = v[1];
-    string MSG = "TESTE ";
-    cout << UserLogin << endl;
-    for(int i = 0;i<v.size();i++)
-      printf("%s\n",v[i].c_str());
+    string MSG = "";
+  
     for(int i = 2;i<v.size();i++)
       MSG += v[i] + " ";
     MSG += '\n';
     cout << MSG;
+
+
+
     if( logins_used.find(UserLogin) == logins_used.end() )
       return 0;
+    
 
     char buffer[BUFSIZE];
-    strcpy(buffer,"TESTE");
+    strcpy(buffer,MSG.c_str() );
     // Possivel paralelizar essa parte do envio!
-    printf("Possui %d quantidade de followers", followers[UserLogin].size());
     for(auto user: followers[UserLogin]){
-      puts("HERE");
       //Abro uma conexao com cada um, e envio a MSG, posso fazer essa parte em paralelo
       Client *follow = new Client(); 
       follow = name_refer[ user.st ];
-      cout << "Enviando para o IP: " << follow->IP << endl;
+      
       int PORT = user.nd;
 
       TSocket sender = ConnectToServer(follow-> IP ,PORT);
@@ -283,11 +284,14 @@ int Server::Publish(void* client, char *buffer_args){
       close(sender);
 
     }
+    pthread_mutex_unlock(&mutex);
+
     return 1;
 
 }
 
 int Server::Subscribe(void* client, char* buffer){
+    pthread_mutex_lock(&mutex);
     Client *A = ( (Client *) client); // making a cast for a object
     string parser(buffer);
     stringstream ss(parser); //stream that will parser
@@ -304,15 +308,14 @@ int Server::Subscribe(void* client, char* buffer){
       return 0;
 
     int s; // variavel auxiliar
-    pthread_mutex_lock(&mutex);
+   
 
     s = subscription++;
 
-    pthread_mutex_unlock(&mutex);
-
     subs[s] = mp(follow,A->UserLogin); // gambiarra pra usar o codigo de subscricao.
     followers[follow].insert( mp( A->UserLogin, stoi(port) )) ;
-
+    pthread_mutex_unlock(&mutex);
+    
     return s;
 }
 int Server::CancelSubscription(void*client, char*buffer){
@@ -321,24 +324,24 @@ int Server::CancelSubscription(void*client, char*buffer){
     stringstream ss(parser); //stream that will parser
     vector<string> v;        // vector with the strings;
     while(ss >> parser){ v.pb(parser); }
-
-    if(v.size() != 3)
-      return 2;
+    
     int s;
-    s = stoi(v[2]);
-
-
+    s = stoi(v[1]);
     if( subs.find(s) == subs.end() ){
       return 0;
     }
 
+    pthread_mutex_lock(&mutex);
+
+
     string follow = subs[s].st;
     string UserLogin = subs[s].nd;
     set< pair<string,int> >::iterator it;
-    it = followers[follow].lower_bound( mp(UserLogin, INF)  );
+    it = followers[follow].lower_bound( mp(UserLogin, -INF)  );
+
     followers[follow].erase(  it  );
     subs.erase(  subs.find(s)  );
-
+    pthread_mutex_unlock(&mutex);
 
     return 1;
 }
@@ -352,7 +355,7 @@ int Server::addUser( void* client , char *buffer){
       return 2;
     }
     string name = parser.substr(0,pos_space);
-    cout << "Nome  " << name << endl;
+    pthread_mutex_lock(&mutex);
 
     if(logins_used.find(name) != logins_used.end() )
       return 0;
@@ -361,6 +364,8 @@ int Server::addUser( void* client , char *buffer){
     logins_used.insert(name);
     clients.insert(A);
     name_refer[name] = A;
+    pthread_mutex_unlock(&mutex);
+
     return 1;
 }
 
