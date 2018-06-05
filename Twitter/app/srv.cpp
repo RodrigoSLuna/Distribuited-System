@@ -101,16 +101,16 @@ void Server::Connection(){
       char IP[IPSIZE];
       getIP( sock_aux ,IP );
       printf("IP::: %s\n",IP);
-       if(IpToClient.find( IP ) != IpToClient.end() ){
-         a = IpToClient[IP];
-         a->sock = sock_aux;
-         a->IP = IP;
-       }
-       else{
+       // if(IpToClient.find( IP ) != IpToClient.end() ){
+       //   a = IpToClient[IP];
+       //   a->sock = sock_aux;
+       //   a->IP = IP;
+       // }
+       // else{
         a->IP = IP;
         a->sock = sock_aux;
         IpToClient[IP] = a;
-      }
+      // }
       printf("\n|Connection Started\n");
       printf("|-IP: %s\n", a->IP);
       printf("sock: %d\n",a->sock);
@@ -118,7 +118,6 @@ void Server::Connection(){
       if(pthread_create(&threads[tid++], NULL, (THREADFUNCPTR) &Server::HandleRequest ,a) )
         ExitWithError("pthread_create() failed");
 
-      //delete a;
       }
     }
 
@@ -255,37 +254,40 @@ int Server::Publish(void* client, char *buffer_args){
     MSG += '\n';
     cout << MSG;
 
-
-
     if( logins_used.find(UserLogin) == logins_used.end() ){
       printf("\n+\n+ %s\n+ CANNOT PUBLISH\n+\n", A-> IP);
-
       ResponseExcepetionUser(0,A->sock);
       return 0;
     }
     printf("\n+\n+ %s\n+ PUBLISH\n+\n", A-> IP);
-    ResponseOkUser(A->sock,1);
 
 
     char buffer[BUFSIZE];
     strcpy(buffer,MSG.c_str() );
     // Possivel paralelizar essa parte do envio!
+    cout << "MSG: " + string(buffer) << " FIM DA MENSAGEM"<< endl;
+    
     for(auto user: followers[UserLogin]){
       //Abro uma conexao com cada um, e envio a MSG, posso fazer essa parte em paralelo
       Client *follow = new Client();
       follow = name_refer[ user.st ];
 
       int PORT = user.nd;
+      cout << "Enviando mensagem para: " + user.st + " ...." << endl;
 
+
+      cout << "Enviando para IP: " << follow->IP <<   " PORTA " + PORT << endl;
       TSocket sender = ConnectToServer(follow-> IP ,PORT);
+
       if(WriteN(sender, buffer , BUFSIZE ) < 0){
         ExitWithError("WriteN Failed()");
       }
 
       close(sender);
-
+      cout << "Enviou mensagem para: " + user.st << endl;
     }
-
+    cout << "Enviando mensagem para finalizar conexao com o Publisher: " << A->sock << " " << 1 << endl;
+    ResponseOkUser(A->sock,1);
     return 1;
 
 }
@@ -307,7 +309,6 @@ int Server::Subscribe(void* client, char* buffer){
       return 0;
 
     int s; // variavel auxiliar
-
 
     s = subscription++;
 
