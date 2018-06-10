@@ -16,7 +16,7 @@ SRC = ../src
 OBJ = ../obj
 BIN = ../bin
 
-CC = g++ -std=c++11
+CC = g++ -std=c++11 -g
 CFLAGS = -I$(INC)
 LFLAGS = -lpthread
 

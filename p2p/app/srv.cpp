@@ -32,11 +32,12 @@ void GeneratePeerId(int *id, char *IP){
 	int size = strlen(IP);
 	for(int i = 0; IP[i] != '\0';i++){
 		if(IP[i] >= '0' and IP[i] <= '9')	
-			val += ( (IP[i] - '0')*pow(10,size));
+			val += ( ( (IP[i] - '0')*( (long long)pow(10,size) )%pw[m] )) %pw[m];
+		
 		size--;
 		while( val > pw[m] ) val -= pw[m];
 	}
-	printf("%lld\n",val);	
+	printf("%d %d\n",val,pw[m]);	
 	*id = val;
 }
 
@@ -91,7 +92,7 @@ void* Peer::HandleRequest( void* args){
 	}
 		
 	usr_option = buffer[0];	
-
+	printf("Buffer: %s",buffer);	
 }
 void Peer:: Connection(){
 	while(true){
