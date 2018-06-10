@@ -8,7 +8,7 @@ using namespace std;
 const int INF = 1e6;
 long long pw[m+1];
 /*
-Pedaço de codigo que nao deve estar aqui
+LALALALALALA Pedaço de codigo que nao deve estar aqui
 */
 void init(){
 	pw[0] = 1;
