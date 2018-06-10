@@ -49,6 +49,7 @@ public:
   int id;
   vector<int> FILES; // Possivelmente vai virar 1 descritor de arquivo!. 
   TSocket sock;
+  Peer *zero;
   Peer *pre, *suc;
   Peer(){}
   Peer(char *IP, unsigned int PORT){
@@ -57,18 +58,23 @@ public:
     GeneratePeerId(&id,IP);
     printf("id: %d\n",id);
   }
-  static void int join(void * client,char *buffer);
+  int join();
   static void* HandleRequest( void* args );
   void Connection();
   ~Peer(){}
 };
 
 
-int Peer::join(void* client, char *buffer){
-	Peer *A = ( (Peer*)  );
+int Peer::join(){
+	char buffer[BUFSIZE];
 	
+	sprintf(buffer, "1 %s %s \n",this->IP, this-PORT);	
 
-
+	TSocket sender = ConnectToServer(this->zero->IP,this->zero->PORT);	
+	if(WriteN(sender,buffer, BUFSIZE) < 0 )
+		ExitWithError("WriteN failed");
+	
+	close(sender);
 	
 }
 void* Peer::HandleRequest( void* args){
@@ -81,14 +87,7 @@ void* Peer::HandleRequest( void* args){
 		return NULL;
 	}
 		
-	user_option = buffer[0];
-
-	switch(user_option){
-		case '1':
-		ok = join(args, buffer);
-	}
-	
-
+	usr_option = buffer[0];	
 
 }
 void Peer:: Connection(){
@@ -113,14 +112,17 @@ void Peer:: Connection(){
 
 
 int main(int argc, char ** argv){
-
-  if (argc != 4 ){
-   ExitWithError("Usage:peer0 <remote server IP>  client <remote server IP> <remote server Port> ");
-  }
   init();
-  Peer *node = new Peer(argv[2],atoi(argv[3]));
-  // Entro na rede, a partir do no 0
-  node->join(argv[1]); 
-
+  if (argc == 5 ){ 
+	 Peer *zero = new Peer(argv[1],atoi( argv[2] ));
+  	 Peer *node = new Peer(argv[3],atoi(argv[4]));
+ 	 node->zero = zero;
+  	 node->join();
+  }
+  else if(argc == 3){
+  	 Peer *node = new Peer(argv[1],atoi(argv[2]));
+  }
+  else
+	puts("Quantidade de parametros errados");
   return 0;
 }
