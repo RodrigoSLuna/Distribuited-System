@@ -61,6 +61,9 @@ public:
   int join();
   static void* HandleRequest( void* args );
   void Connection();
+  void Create(){
+ 	this->sock = CreateServer(this->PORT);
+  }
   ~Peer(){}
 };
 
@@ -113,16 +116,19 @@ void Peer:: Connection(){
 
 int main(int argc, char ** argv){
   init();
+  Peer *node, *zero;
   if (argc == 5 ){ 
-	 Peer *zero = new Peer(argv[1],atoi( argv[2] ));
-  	 Peer *node = new Peer(argv[3],atoi(argv[4]));
+	 zero = new Peer(argv[1],atoi( argv[2] ));
+  	 node = new Peer(argv[3],atoi(argv[4]));
  	 node->zero = zero;
   	 node->join();
   }
   else if(argc == 3){
-  	 Peer *node = new Peer(argv[1],atoi(argv[2]));
+  	 node = new Peer(argv[1],atoi(argv[2]));
   }
   else
-	puts("Quantidade de parametros errados");
-  return 0;
+	return 0*puts("Quantidade de parametros errados");
+ node->Create(); 
+ node->Connection();
+ return 0;
 }
