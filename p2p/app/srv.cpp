@@ -27,7 +27,7 @@ void getIP(TSocket sock, char* A){
 	strcpy(A,inet_ntoa(cliAddr.sin_addr));
 }
 
-void GeneratePeerId(int *id, char *IP){
+void GeneratePeerId(int *id, const char *IP){
 	int val = 0;
 	int size = strlen(IP);
 	for(int i = 0; IP[i] != '\0';i++){
@@ -46,14 +46,14 @@ public:
   int tid; //Thread_Lists;
   pthread_t threads[NUMTHREADS];
   char *IP;
-  unsigned int PORT;
-  int id;
+  int PORT;
+  static int id;
   vector<int> FILES; // Possivelmente vai virar 1 descritor de arquivo!. 
   TSocket sock;
   Peer *zero;
-  Peer *pre, *suc;
+  static Peer *pre, *suc;
   Peer(){}
-  Peer(char *IP, unsigned int PORT){
+  Peer(char *IP,int PORT){
     this->IP = IP;
     this->PORT = PORT;
     GeneratePeerId(&id,IP);
@@ -61,6 +61,7 @@ public:
   }
   int join();
   static void* HandleRequest( void* args );
+  static int findsucessor(void *client, char *buffer);
   void Connection();
   void Create(){
  	this->sock = CreateServer(this->PORT);
@@ -72,9 +73,13 @@ public:
 int Peer::join(){
 	char buffer[BUFSIZE];
 	
-	sprintf(buffer, "1 %s %s \n",this->IP, this-PORT);	
-
+	if(this->zero == NULL ) puts("NULL");
+	sprintf(buffer, "1 %s %d \n",this->IP, this->PORT);	
+	
+	printf("%s %d\n",this->zero->IP,this->zero->PORT);
 	TSocket sender = ConnectToServer(this->zero->IP,this->zero->PORT);	
+	puts("Conectado...");
+
 	if(WriteN(sender,buffer, BUFSIZE) < 0 )
 		ExitWithError("WriteN failed");
 	
@@ -92,18 +97,56 @@ void* Peer::HandleRequest( void* args){
 	}
 		
 	usr_option = buffer[0];	
-	printf("Buffer: %s",buffer);	
+	printf("usr_option: %c\n",usr_option);
+	switch(usr_option){
+		case '1':
+			findsucessor(args,buffer);
+			if(WriteN(A->sock, buffer, BUFSIZE) < 0 ){
+				printf("Findsucessor failled\n");
+				return NULL;
+			}
+	}	
 }
+
+int Peer::findsucessor(void *client, char *buffer){
+	Peer *A = (Peer* ) client;
+	string parser(buffer);
+	stringstream ss(parser);
+	vector<string> v;
+	while(ss>>parser){v.pb(parser);}
+	string::size_type sz;
+	char IP[BUFSIZE];
+	int PORT;
+	sprintf(IP, "%s",v[1].c_str());
+	PORT = stoi(v[2], &sz );	
+	cout << "findsucessor "<< IP << " " << PORT << endl;
+	int id1;
+	GeneratePeerId(&id1, IP);
+	printf("buscando Posicao para o ID: %d, meu id:%d\n",id1,id);
+	//Adiciono no final da lista
+	// Falta adicionar o pre, preciso avisar pro peer atualizar...
+	if( suc == NULL and id1 > id ){	
+		Peer *node = new Peer( IP,PORT );
+		suc = node;
+		cout << suc->IP << " " << suc->PORT << endl;
+	}
+	else if( suc != NULL and id1 > suc->id ){
+		
+	}
+}
+
 void Peer:: Connection(){
 	while(true){
 		if(tid == NUMTHREADS)
 			ExitWithError("Number of threads is over");
 
 		Peer *a = new Peer();
+		puts("Esperando conexao");
 		int sock_aux = AcceptConnection( this -> sock );
 		char IP[IPSIZE];
 		getIP(sock_aux,IP);
-		
+		a->IP = IP;
+		a->sock = sock_aux;
 		printf("\n|Connection Started\n");
 		printf("|-IP: %s\n",a->IP);
 		printf("sock: %d\n", a->sock);
@@ -114,7 +157,9 @@ void Peer:: Connection(){
 }
 
 
-
+Peer * Peer::suc;
+Peer * Peer::pre;
+int Peer::id;
 int main(int argc, char ** argv){
   init();
   Peer *node, *zero;
@@ -126,6 +171,7 @@ int main(int argc, char ** argv){
   }
   else if(argc == 3){
   	 node = new Peer(argv[1],atoi(argv[2]));
+  	 node->id = 0;
   }
   else
 	return 0*puts("Quantidade de parametros errados");
