@@ -14,9 +14,8 @@
 #include <set>
 #include "mysocket.h"
 #define pb push_back
-#define BUFSIZE 100
 #define NUMTHREADS 100
-#define IPSIZE 16
+#define IPSIZE 20
 using namespace std;
 struct Message{
 	std::vector< std:: string> lista;

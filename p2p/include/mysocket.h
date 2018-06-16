@@ -17,7 +17,6 @@
 #define MAXLINELEN 10   /* maximum line size */
 #define NTHREADS 100
 #define BUFSIZE 150
-#define IPSIZE 16
 #define pb push_back
 #define mp make_pair
 #define st first
