@@ -140,10 +140,12 @@ class Peer{
 	}
 	int join(Peer *A, char *buffer);
 	int send(Peer *A, char *buffer);
+	int receive(Peer *A, char *buffer);
 	static void* HandleRequest( void* args );
 	static int findsucessor(void *client, char *buffer);
 	static int upload_file (void *client, char *buffer);
 	static int receive_file (void *client, char *buffer);
+	static int send_file (void *client, char *buffer);
 	void Connection( Peer *ptr);
 	static int atualizaPredecessor(void* args, char *buffer);
 	void Create(){
@@ -152,6 +154,53 @@ class Peer{
 	~Peer(){}
 };
 
+int Peer:: receive(Peer*A, char *buffer){
+	cout << "CONECTANDO COM: " <<  A->IP << " " << A->PORT << endl;	
+	cout << "Nome do arquivo: " << buffer << endl;	
+	char send[BUFSIZE];
+	sprintf(send, "4 %s \n", buffer);
+	
+	TSocket sender = ConnectToServer(A->IP,A->PORT);	
+	puts("Conectado...");		
+
+	cout << "ENVIANDO NOME DO ARQUIVO QUE QUERO: " << buffer << endl;
+	if(WriteN(sender,send, BUFSIZE) < 0 )
+		ExitWithError("WriteN failed");
+	/*
+	BUGADO
+	cout << "Esperando confirmaçao do recebimento do nome do arquivo" << endl;
+	if(ReadLine(sender,send,BUFSIZE) <0 )
+		ExitWithError("#waitting back message failled");
+	puts("Confirmou o recebimento");
+	puts("Enviando conteúdo... ");
+	char filename[BUFSIZE];	
+	sprintf(filename,"%s%s",this->PATH.c_str(),buffer);
+	cout <<"filename " << filename << endl;
+	ifstream myfile( filename );
+	string line;
+	int number_of_lines = 0;
+	
+	while(getline(myfile,line)){
+		cout << line << endl;
+		number_of_lines++;
+	}
+	cout << "# lines " <<  number_of_lines << endl;
+	//Envio a quantidade de linhas	
+	memset(send,'\0',sizeof(send));
+	sprintf(send,"%d \n",number_of_lines);	
+	cout << "ENVIANDO: " << send;
+	if(WriteN(sender, send, BUFSIZE) < 0 )
+		ExitWithError("#lines WriteN failed");	
+	puts("Conteudo enviado...");
+	puts("Aguardando confirmação de recebimento");
+	if(ReadN(sender,send,BUFSIZE) <0 )
+		ExitWithError("#waitting back message failled");
+	puts("Confirmou o recebimento");
+	cout << send << endl;
+	*/
+	close(sender);
+	cout << "Conexao fechada" << endl;
+}
 int Peer:: send(Peer*A, char *buffer){
 	cout << "CONECTANDO COM: " <<  A->IP << " " << A->PORT << endl;	
 	cout << "Nome do arquivo: " << buffer << endl;	
@@ -199,6 +248,24 @@ int Peer:: send(Peer*A, char *buffer){
 	close(sender);
 	cout << "Conexao fechada" << endl;
 }
+int Peer:: send_file(void *client, char* buffer){
+	Peer *A = (Peer*) client;
+	//Recebo nome do arquivo, Pego o nome do arquivo
+	string name;
+	string parser(buffer);
+	stringstream ss(parser);
+	string filename;
+	int i = 0;
+	while(ss>>parser){
+		if(i == 1) filename = parser;
+		i++;
+	}	
+	cout << "Abre Arquivo e envia!" << endl;	
+	cout << A->PATH+filename <<endl;
+
+
+}	
+
 int Peer:: receive_file(void *client, char* buffer){
 	Peer *A = (Peer*) client;
 	//Recebo nome do arquivo, Pego o nome do arquivo
@@ -263,6 +330,9 @@ void* Peer::HandleRequest( void* args){
 			break;
 		case '3':
 			receive_file(args,buffer);
+			break;
+		case '4':
+			send_file(args,buffer);
 			break;
 	}
 }
@@ -400,12 +470,13 @@ void* HandleRequest_Menu(void* args){
 		puts("\t\t3 --- Download FILE");
 		int op;
 		scanf("%d",&op);
+		char buffer[BUFSIZE];
+		char file_name[BUFSIZE];
 		if( op != 2 and op != 3)
 			puts("\t\tOPÇÃO INVALIDA");	
 		else if(op == 2) {
 			puts("\t\tDigite nome do arquivo");			
-			char buffer[BUFSIZE];
-			char file_name[BUFSIZE];
+	
 			cin >> buffer;
 			sprintf(file_name,"%s",buffer);	
 			int key,my_id;
@@ -425,8 +496,29 @@ void* HandleRequest_Menu(void* args){
 				A->join(A->suc, buffer);
 			}
 			else break;
-		
-	
+		}
+		else if(op == 3){
+			puts("\t\tDigite nome do arquivo");			
+			cin >> buffer;
+			sprintf(file_name,"%s",buffer);	
+			int key,my_id;
+			GenerateKey(&key, buffer);
+
+			GeneratePeerId( &my_id, A->IP, A->PORT );
+			A->id = my_id;
+			sprintf(buffer, "2 %s %d %d \n",A->IP, A->PORT,key);
+			//cout << "Meu IP: " << A->IP << " MINHA PORTA " << A->PORT << endl;
+			//cout << "Key: " << key << " my_id " << A->id << endl;
+			// O peer que devera ficar com o arquivo, esta a esquerda do no
+			if(key < A->id) {
+				A->join(A->zero, buffer);		
+			}
+			// O peer que devera ficar com o arquivo, esta a direita do no
+			else if( key > A->id and A->suc->IP != A->zero->IP and A->suc->PORT != A->zero->PORT ){
+				A->join(A->suc, buffer);
+			}
+			else break;
+		}	
 		//	else{
 		// Se nao eu fico com o conteudo
 		//		sprintf(buffer, "3 %s %d \n",A->IP, A->PORT);	
@@ -435,14 +527,15 @@ void* HandleRequest_Menu(void* args){
 			string con_IP;
 			char parser_IP[BUFSIZE];
 			int con_PORT;
-			GetInfo(buffer, con_IP, con_PORT);	
-			
+			GetInfo(buffer, con_IP, con_PORT);		
 			sprintf(parser_IP,"%s",con_IP.c_str());
 		
 			Peer *receiver = new Peer(parser_IP, con_PORT);
-			A->send(receiver, file_name);		
+			if(op == 2)
+				A->send(receiver, file_name);		
+			else if(op == 3)
+				A->receive(receiver,file_name);
 		
-		}
 	}	
 }
 void* HandleRequest_Connection(void* args){
