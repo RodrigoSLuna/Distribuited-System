@@ -1,6 +1,7 @@
 #include <stdio.h>      /*  printf(), perror() and fprintf() */
 #include <sys/socket.h> /*  socket(), bind(), and connect() */
 #include <sys/types.h>  /*  predefined symbolic constants and data structures */
+#include <sys/stat.h>
 #include <arpa/inet.h>  /*  sockaddr_in and inet_ntoa() */
 #include <stdlib.h>     /*  atoi() and exit() */
 #include <string.h>     /*  memset() */
@@ -12,6 +13,7 @@
 #include <map>
 #include <iostream>
 #include <set>
+#include <fstream>
 #include "mysocket.h"
 #define pb push_back
 #define NUMTHREADS 100

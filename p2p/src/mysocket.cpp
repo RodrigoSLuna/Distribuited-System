@@ -151,7 +151,7 @@ int ReadLine(TSocket sock, char *ptr, int maxLen) {
   
   for (n = 1; n < maxLen; n++) {
     if ( (rc = read(sock, &c, 1)) == 1) {
-      *ptr++ = c;
+	*ptr++ = c;
     if(*(ptr-1) == '\0') ptr--;
       if (c == '\n') break;
     } else if (rc == 0) {
