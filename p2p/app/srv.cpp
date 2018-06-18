@@ -166,8 +166,9 @@ int Peer:: receive(Peer*A, char *buffer){
 	cout << "ENVIANDO NOME DO ARQUIVO QUE QUERO: " << buffer << endl;
 	if(WriteN(sender,send, BUFSIZE) < 0 )
 		ExitWithError("WriteN failed");
+	
+	//BUGADO
 	/*
-	BUGADO
 	cout << "Esperando confirmaçao do recebimento do nome do arquivo" << endl;
 	if(ReadLine(sender,send,BUFSIZE) <0 )
 		ExitWithError("#waitting back message failled");
@@ -193,6 +194,7 @@ int Peer:: receive(Peer*A, char *buffer){
 		ExitWithError("#lines WriteN failed");	
 	puts("Conteudo enviado...");
 	puts("Aguardando confirmação de recebimento");
+	
 	if(ReadN(sender,send,BUFSIZE) <0 )
 		ExitWithError("#waitting back message failled");
 	puts("Confirmou o recebimento");
@@ -202,24 +204,33 @@ int Peer:: receive(Peer*A, char *buffer){
 	cout << "Conexao fechada" << endl;
 }
 int Peer:: send(Peer*A, char *buffer){
+	cout << "SEND" << endl;
 	cout << "CONECTANDO COM: " <<  A->IP << " " << A->PORT << endl;	
 	cout << "Nome do arquivo: " << buffer << endl;	
 	char send[BUFSIZE];
 	sprintf(send, "3 %s \n", buffer);
 	
 	TSocket sender = ConnectToServer(A->IP,A->PORT);	
-	puts("Conectado...");		
-
+	cout << "Conectado ... " << sender << endl;
 	cout << "ENVIANDO NOME DO ARQUIVO: " << buffer << endl;
 	if(WriteN(sender,send, BUFSIZE) < 0 )
 		ExitWithError("WriteN failed");
 	/*
-	BUGADO
+
 	cout << "Esperando confirmaçao do recebimento do nome do arquivo" << endl;
-	if(ReadLine(sender,send,BUFSIZE) <0 )
+	if(ReadN(sender,send,BUFSIZE) <0 )
 		ExitWithError("#waitting back message failled");
+	cout << send << endl;
 	puts("Confirmou o recebimento");
-	puts("Enviando conteúdo... ");
+
+	char buffer2[BUFSIZE] = "\0";
+
+	sprintf(buffer2,"2 \n",BUFSIZE);	
+	cout << "ENVIANDO: " << buffer2;
+	if(WriteN(sender, buffer2, BUFSIZE) < 0 )
+		ExitWithError("#lines WriteN failed");	
+	puts("Conteudo enviado...");
+	
 	char filename[BUFSIZE];	
 	sprintf(filename,"%s%s",this->PATH.c_str(),buffer);
 	cout <<"filename " << filename << endl;
@@ -233,20 +244,17 @@ int Peer:: send(Peer*A, char *buffer){
 	}
 	cout << "# lines " <<  number_of_lines << endl;
 	//Envio a quantidade de linhas	
-	memset(send,'\0',sizeof(send));
-	sprintf(send,"%d \n",number_of_lines);	
+	char buffer2[BUFSIZE] = "\0";
+
+	sprintf(buffer2,"%d \n",number_of_lines);	
 	cout << "ENVIANDO: " << send;
-	if(WriteN(sender, send, BUFSIZE) < 0 )
+	if(WriteN(sender, buffer2, BUFSIZE) < 0 )
 		ExitWithError("#lines WriteN failed");	
 	puts("Conteudo enviado...");
-	puts("Aguardando confirmação de recebimento");
-	if(ReadN(sender,send,BUFSIZE) <0 )
-		ExitWithError("#waitting back message failled");
-	puts("Confirmou o recebimento");
-	cout << send << endl;
+	
 	*/
 	close(sender);
-	cout << "Conexao fechada" << endl;
+	cout << "Conexao fechada " << sender << endl;
 }
 int Peer:: send_file(void *client, char* buffer){
 	Peer *A = (Peer*) client;
@@ -267,6 +275,7 @@ int Peer:: send_file(void *client, char* buffer){
 }	
 
 int Peer:: receive_file(void *client, char* buffer){
+	cout << "RECEIVE_FILE " << endl;
 	Peer *A = (Peer*) client;
 	//Recebo nome do arquivo, Pego o nome do arquivo
 	string name;
@@ -278,13 +287,25 @@ int Peer:: receive_file(void *client, char* buffer){
 		if(i == 1) filename = parser;
 		i++;
 	}	
-	
+	cout << A->IP << " " << A-> PORT << " "<< A->sock_peer << endl;
 	cout << A->PATH+filename <<endl;
 	ofstream o(A->PATH+filename);
-	o <<"TESTE " << endl;	
+	o <<"TESTE " << endl;
+	sprintf(buffer,"ok \n", BUFSIZE);
+	/*
+	cout << "->> Enviando que recebeu o nome\n" << buffer;	
+	if(WriteN(A->sock_peer, buffer, BUFSIZE) < 0 )
+		ExitWithError("WriteN COnfirmando recebimento NOME failed");	
+	cout << "Recebendo Quantidade de linhas do arquivo " << endl;
+	char buffer2[BUFSIZE];
 	
-
-
+	if(ReadN(A->sock_peer, buffer2, BUFSIZE) < 0 )
+		ExitWithError("WriteN COnfirmando recebimento NOME failed");	
+	cout << "buffer2: " << buffer2 << endl;
+	cout << "Recebendo Quantidade de linhas do arquivo " << endl;
+	cout << strlen(buffer2) << endl;
+	cout << buffer2 << endl;
+	*/
 }
 int Peer::join(Peer *A, char *buffer){
 	cout << "CONECTANDO COM: " <<  A->IP << " " << A->PORT << endl;	
@@ -300,7 +321,7 @@ int Peer::join(Peer *A, char *buffer){
 		ExitWithError("ReadLine failed");
 	cout << "Recebi: "<< buffer;
 	close(sender);
-	cout << "Conexao fechada" << endl;
+	cout << "Conexao fechada "  << sender << endl;
 }
 void* Peer::HandleRequest( void* args){	
 	char buffer[BUFSIZE], usr_option;
@@ -311,7 +332,7 @@ void* Peer::HandleRequest( void* args){
 			return NULL;
 	}
 	usr_option = buffer[0];	
-	cout << "Requisitando: "<< buffer << endl;
+	cout << "Requisitando: "<< buffer << " do socket " << A->sock_peer << endl;
 	switch(usr_option){
 		case '1':	
 			findsucessor(args,buffer);
@@ -366,7 +387,7 @@ int Peer::upload_file(void*client , char*buffer ){
 			sprintf(buffer,"2 %s %d \n",A->IP,A->PORT);			
 	} 
 	else{	
-		sprintf(buffer,"2 %d \n",id_busca);
+		sprintf(buffer,"2 %s %d %d \n",add_IP.c_str(), add_PORT,id_busca);
 		A->join(suc,buffer);
 	}
 }
@@ -507,14 +528,16 @@ void* HandleRequest_Menu(void* args){
 			GeneratePeerId( &my_id, A->IP, A->PORT );
 			A->id = my_id;
 			sprintf(buffer, "2 %s %d %d \n",A->IP, A->PORT,key);
-			//cout << "Meu IP: " << A->IP << " MINHA PORTA " << A->PORT << endl;
-			//cout << "Key: " << key << " my_id " << A->id << endl;
-			// O peer que devera ficar com o arquivo, esta a esquerda do no
+			cout << "Meu IP: " << A->IP << " MINHA PORTA " << A->PORT << endl;
+			cout << "Key: " << key << " my_id " << A->id << endl;
+			// cout << "O peer que devera ficar com o arquivo, esta a esquerda do no
 			if(key < A->id) {
 				A->join(A->zero, buffer);		
 			}
 			// O peer que devera ficar com o arquivo, esta a direita do no
 			else if( key > A->id and A->suc->IP != A->zero->IP and A->suc->PORT != A->zero->PORT ){
+				cout << "ENTROU AQUI " << endl;
+				cout << A->suc->IP << " " << A->suc->PORT << endl;
 				A->join(A->suc, buffer);
 			}
 			else break;
@@ -529,7 +552,7 @@ void* HandleRequest_Menu(void* args){
 			int con_PORT;
 			GetInfo(buffer, con_IP, con_PORT);		
 			sprintf(parser_IP,"%s",con_IP.c_str());
-		
+			cout << "VAI SE CONECTAR COM: " << parser_IP << " " << con_PORT << endl;	
 			Peer *receiver = new Peer(parser_IP, con_PORT);
 			if(op == 2)
 				A->send(receiver, file_name);		
