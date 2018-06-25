@@ -37,7 +37,7 @@ void getIP(TSocket sock, char* A){
   struct sockaddr_in cliAddr;
   memset((void *) &cliAddr, 0, sizeof(cliAddr));
   cliLen = sizeof(cliAddr);
-  printf("->>>sock: %d\n",sock);
+  
   if (getpeername(sock, (struct sockaddr *) &cliAddr, &cliLen)) {
     ExitWithError("Error in getting IP");
   }
@@ -131,7 +131,7 @@ void Server:: ResponseExcepetionUser(const int &op, const TSocket &sock){
 
 void* Server:: HandleRequest(void* args){
     char buffer[ BUFSIZE ],user_option;
-    if(args == NULL ) puts("NULL");
+    
     Client *A = (Client* )args;
     printf("Sock: %d, IP sendo tratado: %s, nome sendo tratado: %s\n",A->sock,A->IP,A->UserLogin.c_str());
     if (ReadLine(A->sock, buffer, BUFSIZE) < 0) {
@@ -311,9 +311,9 @@ int Server::Subscribe(void* client, char* buffer){
     int s; // variavel auxiliar
 
     s = subscription++;
-
+    // ERRO, ESTOU MAPEANDO A->USERLOGIN, isso eh nulo kct, solucao, colocar para mapear IP
     subs[s] = mp(follow,A->UserLogin); // gambiarra pra usar o codigo de subscricao.
-    followers[follow].insert( mp( A->UserLogin, stoi(port) )) ;
+    followers[follow].insert( mp( A->UserLogin, stoi(port) )) ; // nome que sigo, mapeia, (NOME,PORTA)
 
     return s;
 }
@@ -379,9 +379,9 @@ int Server::ResponseOkUser(const TSocket &sock, const int &subs){
 
 
 /*Undefined reference for the class*/
-set<Client *> Server::clients; // Undefined reference solved here <
+set<Client *> Server::clients; // Undefined reference solved here, conjunto que armazena todos os clients <
 set< string > Server::logins_used;
-map<string, Client*> Server::name_refer;
+map<string, Client*> Server::name_refer; //mapeia nome->informaçoes, mapa dado o nome, retorna as informações
 map< string, set< pair< string , int >  > > Server::followers;
 map<char*, Client*> Server::IpToClient;
 map< int, pair< string, string> > Server ::subs;

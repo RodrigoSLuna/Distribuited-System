@@ -22,7 +22,7 @@ void get_message(Message a, int op ,char *servIP, int &servPort ){
       TSocket sock;
       sock = ConnectToServer(servIP, servPort);
       char buffer[BUFSIZE];
-      snprintf(buffer,99,"%d \n",op);
+      sprintf(buffer,"%d \n",op);
       if( WriteN(sock, buffer, 99 ) < 0  ){
         ExitWithError(" WriteN() failed ");
       }
@@ -81,6 +81,6 @@ int main(int argc, char *argv[]) {
   servIP = argv[1];
   servPort = atoi(argv[2]);
 
-  if( send_receive( online,servIP,servPort) != -1 ){;}
+  while( send_receive( online,servIP,servPort) != -1 ){;}
   return 0;
 }

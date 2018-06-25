@@ -15,14 +15,14 @@ char nome[BUFSIZE],cliPort[BUFSIZE];
 int Register(TSocket srv ){
   puts("Faça o registro do seu nome");
   cin >> nome >>cliPort;
-  char buffer[BUFSIZE];
-  snprintf(buffer, BUFSIZE, "1 %s %s \n",nome,cliPort);
+  char buffer[BUFSIZE] = {'\0'};
+  sprintf(buffer, "1 %s %s \n",nome,cliPort);
   
-  if( WriteN(srv, buffer, sizeof(buffer) ) < 0  ){
+  if( WriteN(srv, buffer, BUFSIZE ) < 0  ){
     ExitWithError(" WriteN() failed ");
   }
 
-  if( ReadLine(srv,buffer,sizeof(buffer)) < 0 ){
+  if( ReadLine(srv,buffer, BUFSIZE ) < 0 ){
     ExitWithError(" ReadLine() failed ");
   }
 
@@ -36,27 +36,27 @@ int Register(TSocket srv ){
 
 void CloseConectionToServer(TSocket &srv){
   char buffer[BUFSIZE];
-  snprintf(buffer,BUFSIZE,"3 %s \n",nome);  
+  sprintf(buffer,BUFSIZE,"3 %s \n",nome);  
   if( WriteN(srv, buffer,BUFSIZE ) < 0 ) { ExitWithError("WriteN() failed ");}
 
 }
 
 //Funcao que ira cuidar das conexões a partir de outras threads.
-void HandleRequest_Conection(void *args){
-  TSocket srv,cliSock;
+void HandleRequest_Conection(TSocket cliSock){
+  //TSocket srv,cliSock;
   int ret; // retorno do select
   fd_set set;  /* file description set */
-  unsigned int cliLen;
-  char *ip;
-  struct sockaddr_in cliAddr; // Endereço de IP do cliente
-  srv = ((struct TArgs* )args)->cliSock; 
-  memset( (void*) &cliAddr, 0, sizeof ( cliAddr )  ); // Zero a estrutura de dados
-  cliLen = sizeof(cliAddr);
+  //unsigned int cliLen;
+  //char *ip;
+  //struct sockaddr_in cliAddr; // Endereço de IP do cliente
+  //srv = ((struct TArgs* )args)->cliSock; 
+  //memset( (void*) &cliAddr, 0, sizeof ( cliAddr )  ); // Zero a estrutura de dados
+  //cliLen = sizeof(cliAddr);
 
-  puts("Aguardando conexao de par ativo");
+  //puts("Aguardando conexao de par ativo");
  
-  cliSock = AcceptConnection(srv);
-  int retcode = getpeername(cliSock, (struct sockaddr *) &cliAddr, &cliLen); // IP da pessoa que acabou de se conectar
+  //cliSock = AcceptConnection(srv);
+  //int retcode = getpeername(cliSock, (struct sockaddr *) &cliAddr, &cliLen); // IP da pessoa que acabou de se conectar
 
   //printf("Conectado com: %s\n",cliAddr.sin_addr);
   for(;;){
@@ -76,11 +76,27 @@ void HandleRequest_Conection(void *args){
     }
     /* Read from stdin */
     if( FD_ISSET(STDIN_FILENO,&set) ){
-      if( write_message(cliSock, nome ) == -1 ) break;
+      //if( write_message(cliSock, nome ) == -1 ) break;
+	char MSG[BUFSIZE] = {'\0'}, buffer[BUFSIZE] = {'\0'};
+	scanf("%[^\n]",MSG);	
+	sprintf(buffer,"%s: %s \n",nome,MSG);
+	if(WriteN(sock, buffer, BUFSIZE ) < 0 ){
+		ExitWithError("1: WriteN() failed");
+	}
     }
-
+    //read from socket
     if( FD_ISSET(cliSock,&set) ){
-      if( read_message(cliSock) == -1 ) break;
+      //if( read_message(cliSock) == -1 ) break;
+	char buffer[BUFSIZE] = {'\0'};
+	if(ReadLine(sock, buffer,BUFSIZE) < 0){
+		ExitWithError("ReadLine() failed");
+	}
+	if(strcmp(buffer,"FIM") == 0){
+		break;
+	}
+	else
+		printf("Peer: %s \n",buffer);
+
     }
   }
   puts("Conexao encerrada");
@@ -89,8 +105,8 @@ void HandleRequest_Conection(void *args){
 int main(int argc, char** argv){
   /*Aceita a conexao!*/
   TSocket srv, cliSock,MySrv;        /* server and client sockets */
-	char *servIP;                /* server IP */
-	unsigned short servPort,cliPort;     /* server port */
+  char *servIP;                /* server IP */
+  unsigned short servPort,cliPort;     /* server port */
   pthread_t conection_thread,main_thread;
   struct TArgs *args,*argSrv,*MyInfo;              /* argument structure for thread */
   fd_set set;  /* file description set */
@@ -103,9 +119,10 @@ int main(int argc, char** argv){
 
   servIP   = argv[1];
   servPort = atoi(argv[2]);
+ 
   srv = ConnectToServer(servIP,servPort);
 
-  puts("Registro");
+ 
   // Envio meu nick e  tento registrar, no servidor.
   while( !Register(srv)  ){ ; }
 
@@ -115,14 +132,43 @@ int main(int argc, char** argv){
   MySrv = CreateServer( MyPort );
   argSrv->cliSock = MySrv;
 //  args->cliSock = srv;
+/*
+Argumentos do select para funcionar a troca de interacao
+entre o servidor e meu stdin
+*/
+ fd_set	set; // descritor de arquivo do select
+ int ret; // retorno do select
+ //Crio um socket para aguardar a conexao
+
 
   while(1){
-    HandleRequest_Conection( argSrv );
-    puts("Deseja encerrar conexao com serivodor? (yes/no)");
-    string op;
-    cin >> op;
-    if(op == "yes")
-      CloseConectionToServer( srv );
+    TSocket cliSock;
+    cliSock = AcceptConnection(MySrv);
+    
+    FD_ZERO(&set);
+    FD_SET(STDIN_FILENO, &set);
+    FD_SET(cliSock, &set);
+    ret = select(FD_SETSIZE, &set, NULL,NULL,NULL);
+
+    if(ret < 0 ){
+	WriteError("Select() failed");    
+	break;
+    } 
+
+    if(FD_ISSET(cliSock, &set) ){
+    	HandleRequest_Conection( cliSock );
+    }
+    if(FD_ISSET(STDIN_FILENO, &set)){
+    	char buffer[BUFSIZE];
+	scanf("%[^\n]",buffer);
+	if(strcmp(buffer,"FIM") == 0 ){
+		close(cliSock);	
+  		srv = ConnectToServer(servIP,servPort);
+		CloseConectionToServer( srv );
+		break;
+	} 
+      
+    } 
   }
   return 0;
 }
