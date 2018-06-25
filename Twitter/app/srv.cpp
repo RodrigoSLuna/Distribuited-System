@@ -60,7 +60,7 @@ public:
   static set< string >  logins_used;
   static map< string, Client* > name_refer;
   static map< string, set< pair< string , int >  > >followers;
-  static map< int, pair< string, string> > subs; // number subscription to ( follower, follow );
+  static map< int, pair< string, pair< string,int > > > subs; // number subscription to ( follower, follow );
   int tid; // Thread_ids;
 
   Server(){}
@@ -260,7 +260,7 @@ int Server::Publish(void* client, char *buffer_args){
       return 0;
     }
     printf("\n+\n+ %s\n+ PUBLISH\n+\n", A-> IP);
-
+    MSG = UserLogin + ": " + MSG;
 
     char buffer[BUFSIZE];
     strcpy(buffer,MSG.c_str() );
@@ -269,15 +269,16 @@ int Server::Publish(void* client, char *buffer_args){
     
     for(auto user: followers[UserLogin]){
       //Abro uma conexao com cada um, e envio a MSG, posso fazer essa parte em paralelo
-      Client *follow = new Client();
-      follow = name_refer[ user.st ];
-
+      // Client *follow = new Client();
+      // follow = name_refer[ user.st ];
+      char IP[BUFSIZE];
+      strcpy(IP, user.st.c_str());
       int PORT = user.nd;
       cout << "Enviando mensagem para: " + user.st + " ...." << endl;
 
 
-      cout << "Enviando para IP: " << follow->IP <<   " PORTA " + PORT << endl;
-      TSocket sender = ConnectToServer(follow-> IP ,PORT);
+      cout << "Enviando para IP: " << IP <<   " PORTA " + PORT << endl;
+      TSocket sender = ConnectToServer(IP ,PORT);
 
       if(WriteN(sender, buffer , BUFSIZE ) < 0){
         ExitWithError("WriteN Failed()");
@@ -311,14 +312,14 @@ int Server::Subscribe(void* client, char* buffer){
     int s; // variavel auxiliar
 
     s = subscription++;
-    // ERRO, ESTOU MAPEANDO A->USERLOGIN, isso eh nulo kct, solucao, colocar para mapear IP
-    subs[s] = mp(follow,A->UserLogin); // gambiarra pra usar o codigo de subscricao.
-    followers[follow].insert( mp( A->UserLogin, stoi(port) )) ; // nome que sigo, mapeia, (NOME,PORTA)
+    cout << "subscrição valor: " << s << " mapeamento: " << follow << " " << A->IP << " " << port << endl;
+    subs[s] = mp(follow, mp(A->IP,stoi(port) )); // a subscrição guarda IP e PORTA
+    followers[follow].insert( mp( A->IP, stoi(port) )) ; // nome que sigo, mapeia, (NOME,PORTA)
 
     return s;
 }
 int Server::CancelSubscription(void*client, char*buffer){
-   Client *A = ( (Client *) client); // making a cast for a object
+    Client *A = ( (Client *) client); // making a cast for a object
     string parser(buffer);
     stringstream ss(parser); //stream that will parser
     vector<string> v;        // vector with the strings;
@@ -333,9 +334,11 @@ int Server::CancelSubscription(void*client, char*buffer){
 
 
     string follow = subs[s].st;
-    string UserLogin = subs[s].nd;
+    string UserIP = subs[s].nd.st;
+    int PORT      = subs[s].nd.nd;
     set< pair<string,int> >::iterator it;
-    it = followers[follow].lower_bound( mp(UserLogin, -INF)  );
+
+    it = followers[follow].lower_bound( mp(UserIP, PORT)  );
 
     followers[follow].erase(  it  );
     subs.erase(  subs.find(s)  );
@@ -384,7 +387,7 @@ set< string > Server::logins_used;
 map<string, Client*> Server::name_refer; //mapeia nome->informaçoes, mapa dado o nome, retorna as informações
 map< string, set< pair< string , int >  > > Server::followers;
 map<char*, Client*> Server::IpToClient;
-map< int, pair< string, string> > Server ::subs;
+map< int, pair< string, pair< string,int > > > Server ::subs;
 int Server::subscription = 0;
 pthread_mutex_t Server::mutex =  PTHREAD_MUTEX_INITIALIZER;
 int main(int argc, char ** argv){
